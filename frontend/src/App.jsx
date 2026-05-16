@@ -10,6 +10,7 @@ import MonitoringPage from './pages/MonitoringPage';
 import HistorisPage from './pages/HistorisPage';
 import KalibrasiPage from './pages/KalibrasiPage';
 import ProfilePage from './pages/ProfilePage';
+import RekomendasiIkanPage from './pages/RekomendasiIkanPage';
 import AdminUsersPage from './pages/admin/AdminUsersPage';
 import AdminDataPage from './pages/admin/AdminDataPage';
 import AdminLogsPage from './pages/admin/AdminLogsPage';
@@ -52,6 +53,7 @@ function AppRoutes() {
         <Route path="monitoring" element={<MonitoringPage />} />
         <Route path="historis" element={<HistorisPage />} />
         <Route path="profile" element={<ProfilePage />} />
+        <Route path="rekomendasi-ikan" element={<RekomendasiIkanPage />} />
         <Route path="kalibrasi" element={
           <ProtectedRoute roles={['admin', 'pengelola']}><KalibrasiPage /></ProtectedRoute>
         } />

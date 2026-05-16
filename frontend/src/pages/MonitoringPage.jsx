@@ -3,9 +3,7 @@ import api from '../utils/api';
 import { formatNumber, dssColor, sensorIcon } from '../utils/helpers';
 import TimeSeriesChart from '../components/charts/TimeSeriesChart';
 import { PageLoader } from '../components/ui/Spinner';
-import {
-  Play, Pause, RefreshCw, Zap, AlertTriangle, CheckCircle2,
-} from 'lucide-react';
+import { Play, Pause, Zap, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
 export default function MonitoringPage() {
   const [sensors, setSensors] = useState([]);
@@ -13,9 +11,9 @@ export default function MonitoringPage() {
   const [chartHistory, setChartHistory] = useState({});
   const [loading, setLoading] = useState(true);
   const [playing, setPlaying] = useState(true);
-  const [interval, setIntervalVal] = useState(5);
-  const [simulating, setSimulating] = useState(false);
-  const timerRef = useRef(null);
+  const [intervalVal, setIntervalVal] = useState(5);
+  const pollingRef = useRef(null);
+  const simRef = useRef(null);
 
   const fetchLatest = useCallback(async () => {
     try {
@@ -23,14 +21,19 @@ export default function MonitoringPage() {
       setSensors(res.data.sensors);
       setDss(res.data.dss);
 
-      // Append to chart history (keep max 50 points)
       setChartHistory((prev) => {
         const updated = { ...prev };
         res.data.sensors.forEach((s) => {
           if (s.value !== null) {
             const key = s.name;
             if (!updated[key]) {
-              updated[key] = { alias: s.alias, unit: s.unit, threshold_min: s.threshold_min, threshold_max: s.threshold_max, data: [] };
+              updated[key] = {
+                alias: s.alias,
+                unit: s.unit,
+                threshold_min: s.threshold_min,
+                threshold_max: s.threshold_max,
+                data: [],
+              };
             }
             const ts = s.updated_at || new Date().toISOString();
             const lastPoint = updated[key].data[updated[key].data.length - 1];
@@ -48,28 +51,35 @@ export default function MonitoringPage() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchLatest();
-  }, [fetchLatest]);
-
-  useEffect(() => {
-    if (playing) {
-      timerRef.current = window.setInterval(fetchLatest, interval * 1000);
-    }
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [playing, interval, fetchLatest]);
-
-  const handleSimulasi = async () => {
-    setSimulating(true);
+  const handleSimulasi = useCallback(async () => {
     try {
       await api.post('/simulasi');
       await fetchLatest();
     } catch (err) {
       console.error(err);
-    } finally {
-      setSimulating(false);
     }
-  };
+  }, [fetchLatest]);
+
+  // Polling fetch data terbaru
+  useEffect(() => {
+    fetchLatest();
+  }, [fetchLatest]);
+
+  useEffect(() => {
+    if (pollingRef.current) clearInterval(pollingRef.current);
+    if (playing) {
+      pollingRef.current = setInterval(fetchLatest, intervalVal * 1000);
+    }
+    return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
+  }, [playing, intervalVal, fetchLatest]);
+
+  // Auto simulasi berjalan otomatis setiap 3 detik
+  useEffect(() => {
+    simRef.current = setInterval(async () => {
+      await handleSimulasi();
+    }, 1000);
+    return () => { if (simRef.current) clearInterval(simRef.current); };
+  }, [handleSimulasi]);
 
   if (loading) return <PageLoader />;
 
@@ -77,41 +87,13 @@ export default function MonitoringPage() {
 
   return (
     <div className="space-y-6">
-      {/* Controls */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-1.5">
-          <div className="live-dot" />
-          <span className="text-xs font-semibold text-emerald-500 uppercase tracking-wider">Live</span>
+      {/* Live indicator */}
+      <div className="flex items-center gap-2">
+        <div className="relative flex h-2.5 w-2.5">
+          <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping"></span>
+          <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
         </div>
-
-        <button
-          onClick={() => setPlaying(!playing)}
-          className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition ${
-            playing ? 'bg-amber-100 dark:bg-amber-900/20 text-amber-600' : 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-600'
-          }`}
-        >
-          {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-          {playing ? 'Pause' : 'Play'}
-        </button>
-
-        <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-700 rounded-xl p-1">
-          {[3, 5, 10].map((s) => (
-            <button
-              key={s}
-              onClick={() => setIntervalVal(s)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                interval === s ? 'bg-primary-500 text-white' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-              }`}
-            >
-              {s}s
-            </button>
-          ))}
-        </div>
-
-        <button onClick={handleSimulasi} disabled={simulating} className="btn-primary flex items-center gap-2 ml-auto">
-          <Zap className="w-4 h-4" />
-          {simulating ? 'Generating...' : 'Simulasi Data'}
-        </button>
+        <span className="text-xs font-semibold text-emerald-500 uppercase tracking-wider">Live</span>
       </div>
 
       {/* DSS Banner */}
@@ -139,13 +121,17 @@ export default function MonitoringPage() {
       {/* Sensor Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {sensors.map((s, i) => (
-          <div key={s.sensor_id} className="card p-4 animate-slide-up relative overflow-hidden" style={{ animationDelay: `${i * 60}ms` }}>
-            {/* Pulse indicator */}
-            {playing && (
-              <div className="absolute top-3 right-3">
-                <div className="live-dot" />
+          <div
+            key={s.sensor_id}
+            className="card p-4 animate-slide-up relative overflow-hidden"
+            style={{ animationDelay: `${i * 60}ms` }}
+          >
+            <div className="absolute top-3 right-3">
+              <div className="relative flex h-2.5 w-2.5">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping"></span>
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
               </div>
-            )}
+            </div>
             <div className="flex items-center gap-2 mb-2">
               <span className="text-lg">{sensorIcon(s.name)}</span>
               <span className="text-xs font-medium text-slate-400">{s.alias}</span>

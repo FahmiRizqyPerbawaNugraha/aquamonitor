@@ -1,15 +1,15 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
-  LayoutDashboard, Activity, Database, Users, Trash2, ScrollText, KeyRound, Sliders, X, Droplets,
+  LayoutDashboard, Activity, Database, Users, Trash2, ScrollText, KeyRound, Sliders, X, Droplets, Fish,
 } from 'lucide-react';
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'operator', 'pengelola'] },
   { to: '/monitoring', label: 'Monitoring Realtime', icon: Activity, roles: ['admin', 'operator', 'pengelola'] },
   { to: '/historis', label: 'Data Historis', icon: Database, roles: ['admin', 'operator', 'pengelola'] },
-  { to: '/kalibrasi', label: 'Kalibrasi Sensor', icon: Sliders, roles: ['admin', 'pengelola'] },
-  { type: 'divider', label: 'Admin', roles: ['admin'] },
+  { to: '/rekomendasi-ikan', label: 'Rekomendasi Ikan', icon: Fish, roles: ['admin', 'operator', 'pengelola'] },
+  { to: '/kalibrasi', label: 'Kalibrasi Sensor', icon: Sliders, roles: ['admin', 'pengelola'] },  { type: 'divider', label: 'Admin', roles: ['admin'] },
   { to: '/admin/users', label: 'Manajemen User', icon: Users, roles: ['admin'] },
   { to: '/admin/data', label: 'Manajemen Data', icon: Trash2, roles: ['admin'] },
   { to: '/admin/logs', label: 'Log Aktivitas', icon: ScrollText, roles: ['admin'] },

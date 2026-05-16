@@ -11,6 +11,7 @@ use App\Models\WindHistory;
 use App\Services\DSSService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class SensorDataController extends Controller
 {
@@ -53,23 +54,14 @@ class SensorDataController extends Controller
             }
         }
 
-        // Weather (opsional)
         if ($request->has('weather') && $request->weather !== null) {
-            WindHistory::create([
-                'value' => $request->weather,
-                'device_id' => $deviceId,
-            ]);
+            WindHistory::create(['value' => $request->weather, 'device_id' => $deviceId]);
         }
 
-        // Baterai (opsional)
         if ($request->has('baterai') && $request->baterai !== null) {
-            BatteryHistory::create([
-                'value' => $request->baterai,
-                'device_id' => $deviceId,
-            ]);
+            BatteryHistory::create(['value' => $request->baterai, 'device_id' => $deviceId]);
         }
 
-        // Lokasi (opsional)
         if ($request->has('latitude') && $request->has('longitude')) {
             LocationHistory::create([
                 'latitude' => $request->latitude,
@@ -78,7 +70,6 @@ class SensorDataController extends Controller
             ]);
         }
 
-        // DSS Prediction
         $dss = null;
         if (count($dssInput) > 0) {
             $dss = DSSService::analisis($dssInput);
@@ -104,17 +95,14 @@ class SensorDataController extends Controller
      */
     public function index(Request $request)
     {
-        $query = DataHistory::with('sensor')
-            ->orderBy('created_at', 'desc');
+        $query = DataHistory::with('sensor')->orderBy('created_at', 'desc');
 
         if ($request->filled('sensor_id')) {
             $query->where('sensor_id', $request->sensor_id);
         }
-
         if ($request->filled('dari')) {
             $query->whereDate('created_at', '>=', $request->dari);
         }
-
         if ($request->filled('sampai')) {
             $query->whereDate('created_at', '<=', $request->sampai);
         }
@@ -163,7 +151,6 @@ class SensorDataController extends Controller
             ];
         }
 
-        // DSS
         $dssInput = [];
         foreach ($result as $s) {
             if ($s['value'] !== null) {
@@ -179,7 +166,7 @@ class SensorDataController extends Controller
     }
 
     /**
-     * POST /api/simulasi — Generate data dummy
+     * POST /api/simulasi — Generate data dummy yang berubah secara natural
      */
     public function simulasi()
     {
@@ -187,29 +174,54 @@ class SensorDataController extends Controller
         $deviceId = 'AQUA-001';
         $dssInput = [];
 
-        $ranges = [
-            'ph' => [6.0, 9.0],
-            'suhu' => [18, 32],
-            'do' => [3, 15],
-            'tds' => [50, 600],
+        // Ambil nilai terakhir dari cache untuk perubahan natural
+        $lastValues = Cache::get('simulasi_last_values', [
+            'ph' => 7.0,
+            'suhu' => 25.0,
+            'do' => 8.0,
+            'tds' => 200.0,
+        ]);
+
+        // Perubahan gradual yang logis per sensor
+        $changes = [
+            'ph' => ['min' => 6.3, 'max' => 7.5, 'delta' => 0.5],
+            'suhu' => ['min' => 18.0, 'max' => 26.0, 'delta' => 0.3],
+            'do' => ['min' => 3.0, 'max' => 13.0, 'delta' => 0.2],
+            'tds' => ['min' => 50.0, 'max' => 250.0, 'delta' => 5.0],
         ];
 
-        foreach ($ranges as $name => $range) {
+        $newValues = [];
+
+        foreach ($changes as $name => $config) {
+            $last = $lastValues[$name];
+            // Perubahan naik atau turun secara natural
+            $change = (mt_rand(0, 1) === 0 ? 5 : -1) * (mt_rand(0, 100) / 100) * $config['delta'];
+            $newVal = round($last + $change, 2);
+            // Pastikan dalam range
+            $newVal = max($config['min'], min($config['max'], $newVal));
+            $newValues[$name] = $newVal;
+
             $sensor = $sensors->get($name);
             if ($sensor) {
-                $value = round($range[0] + mt_rand() / mt_getrandmax() * ($range[1] - $range[0]), 2);
                 DataHistory::create([
                     'sensor_id' => $sensor->id,
-                    'value' => $value,
+                    'value' => $newVal,
                     'device_id' => $deviceId,
                 ]);
-                $dssInput[$name] = $value;
+                $dssInput[$name] = $newVal;
             }
         }
 
-        // Baterai
+        // Simpan nilai baru ke cache untuk simulasi berikutnya
+        Cache::put('simulasi_last_values', $newValues, now()->addHours(2));
+
+        // Baterai turun perlahan
+        $lastBattery = Cache::get('simulasi_battery', 100.0);
+        $newBattery = round(max(20, $lastBattery - (mt_rand(0, 10) / 100)), 1);
+        Cache::put('simulasi_battery', $newBattery, now()->addHours(2));
+
         BatteryHistory::create([
-            'value' => round(50 + mt_rand() / mt_getrandmax() * 50, 1),
+            'value' => $newBattery,
             'device_id' => $deviceId,
         ]);
 

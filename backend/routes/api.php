@@ -9,6 +9,7 @@ use App\Http\Controllers\ExportController;
 use App\Http\Controllers\ForgotPasswordController;
 use App\Http\Controllers\LogController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\RekomendasiIkanController;
 use App\Http\Controllers\RegisterController;
 use App\Http\Controllers\SensorDataController;
 use App\Http\Controllers\SensorMasterController;
@@ -45,6 +46,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/dashboard/chart', [DashboardController::class, 'chart']);
     Route::get('/sensor-data', [SensorDataController::class, 'index']);
     Route::get('/sensor-data/terbaru', [SensorDataController::class, 'terbaru']);
+    Route::get('/rekomendasi-ikan', [RekomendasiIkanController::class, 'rekomendasi']);
 
     // ==============================
     // EXPORT (admin + pengelola)

@@ -40,8 +40,8 @@ class DSSService
     public static function rekomendasi(string $klasifikasi): string
     {
         return match ($klasifikasi) {
-            'sangat_baik' => 'Sangat cocok untuk budidaya ikan air tawar.',
-            'baik' => 'Cocok untuk budidaya ikan air tawar.',
+            'sangat_baik' => 'Sangat cocok untuk budidaya ikan air laut.',
+            'baik' => 'Cocok untuk budidaya ikan air laut.',
             'cukup_baik' => 'Cukup cocok, kualitas air perlu diawasi ketat.',
             'kurang_baik' => 'Tidak cocok untuk budidaya. Direkomendasikan untuk irigasi.',
             'buruk' => 'Tidak layak digunakan. Perlu penanganan segera.',
