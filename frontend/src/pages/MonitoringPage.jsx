@@ -8,12 +8,19 @@ import { Play, Pause, Zap, AlertTriangle, CheckCircle2 } from 'lucide-react';
 export default function MonitoringPage() {
   const [sensors, setSensors] = useState([]);
   const [dss, setDss] = useState(null);
-  const [chartHistory, setChartHistory] = useState({});
+  const [chartHistory, setChartHistory] = useState(() => {
+    try {
+        const saved = localStorage.getItem('chartHistory');
+        return saved ? JSON.parse(saved) : {};
+    } catch {
+        return {};
+    }
+});
   const [loading, setLoading] = useState(true);
   const [playing, setPlaying] = useState(true);
-  const [intervalVal, setIntervalVal] = useState(5);
+  const [intervalVal, setIntervalVal] = useState(3);
   const pollingRef = useRef(null);
-  const simRef = useRef(null);
+ 
 
   const fetchLatest = useCallback(async () => {
     try {
@@ -22,43 +29,38 @@ export default function MonitoringPage() {
       setDss(res.data.dss);
 
       setChartHistory((prev) => {
-        const updated = { ...prev };
-        res.data.sensors.forEach((s) => {
-          if (s.value !== null) {
+    const updated = { ...prev };
+    res.data.sensors.forEach((s) => {
+        if (s.value !== null) {
             const key = s.name;
             if (!updated[key]) {
-              updated[key] = {
-                alias: s.alias,
-                unit: s.unit,
-                threshold_min: s.threshold_min,
-                threshold_max: s.threshold_max,
-                data: [],
-              };
+                updated[key] = {
+                    alias: s.alias,
+                    unit: s.unit,
+                    threshold_min: s.threshold_min,
+                    threshold_max: s.threshold_max,
+                    data: [],
+                };
             }
-            const ts = s.updated_at || new Date().toISOString();
+            const ts = s.updated_at
+                ? new Date(s.updated_at).toLocaleString('sv-SE', { timeZone: 'Asia/Jakarta' }).replace(' ', 'T')
+                : new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Jakarta' }).replace(' ', 'T');
             const lastPoint = updated[key].data[updated[key].data.length - 1];
             if (!lastPoint || lastPoint.x !== ts) {
-              updated[key].data = [...updated[key].data.slice(-49), { x: ts, y: s.value }];
+                updated[key].data = [...updated[key].data.slice(-49), { x: ts, y: s.value }];
             }
-          }
-        });
-        return updated;
-      });
+        }
+    });
+    localStorage.setItem('chartHistory', JSON.stringify(updated)); // ← simpan ke localStorage
+    return updated;
+});
+
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
   }, []);
-
-  const handleSimulasi = useCallback(async () => {
-    try {
-      await api.post('/simulasi');
-      await fetchLatest();
-    } catch (err) {
-      console.error(err);
-    }
-  }, [fetchLatest]);
 
   // Polling fetch data terbaru
   useEffect(() => {
@@ -73,14 +75,7 @@ export default function MonitoringPage() {
     return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
   }, [playing, intervalVal, fetchLatest]);
 
-  // Auto simulasi berjalan otomatis setiap 3 detik
-  useEffect(() => {
-    simRef.current = setInterval(async () => {
-      await handleSimulasi();
-    }, 1000);
-    return () => { if (simRef.current) clearInterval(simRef.current); };
-  }, [handleSimulasi]);
-
+  
   if (loading) return <PageLoader />;
 
   const dColors = dss ? dssColor(dss.result) : dssColor('baik');

@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../utils/api';
 import { formatNumber, dssColor, sensorIcon } from '../utils/helpers';
 import TimeSeriesChart from '../components/charts/TimeSeriesChart';
 import { PageLoader } from '../components/ui/Spinner';
 import {
-  BarChart3, Zap, Database, BatteryMedium, TrendingUp, AlertTriangle, CheckCircle2, Info,
+  BarChart3, Database, BatteryMedium, TrendingUp, AlertTriangle, CheckCircle2, Info,
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -13,26 +13,45 @@ export default function DashboardPage() {
   const [chartRange, setChartRange] = useState(24);
   const [loading, setLoading] = useState(true);
 
-  const fetchDashboard = async () => {
+  const fetchDashboard = useCallback(async () => {
+    console.log('fetching dashboard...', new Date().toLocaleTimeString());
     try {
       const [dashRes, chartRes] = await Promise.all([
         api.get('/dashboard'),
         api.get(`/dashboard/chart?jam=${chartRange}`),
       ]);
-      setData(dashRes.data);
-      setChartData(chartRes.data);
+      console.log('pH value:', dashRes.data.sensors.ph.value); // ← tambah ini
+      setData({...dashRes.data, _ts: Date.now()});
+      setChartData({...chartRes.data, _ts: Date.now()});
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
-  };
+}, [chartRange]);
 
-  useEffect(() => {
+  const intervalRef = useRef(null);
+
+useEffect(() => {
     fetchDashboard();
-    const interval = setInterval(fetchDashboard, 10000); // auto-refresh 10s
-    return () => clearInterval(interval);
-  }, [chartRange]);
+    
+    intervalRef.current = setInterval(() => {
+        fetchDashboard();
+        console.log('fetching dashboard...', new Date().toLocaleTimeString());
+    }, 3000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchDashboard();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+}, [fetchDashboard]);
 
   if (loading) return <PageLoader />;
   if (!data) return <p className="text-center text-slate-400">Gagal memuat data.</p>;

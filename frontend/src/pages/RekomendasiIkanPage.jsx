@@ -1,144 +1,34 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import api from '../utils/api';
 import { PageLoader } from '../components/ui/Spinner';
 
 export default function RekomendasiIkanPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const simRef = useRef(null);
-  const fetchRef = useRef(null);
 
-  // Parameter ikan untuk simulasi mandiri
-  const ikanParams = [
-    {
-      nama: 'Kerapu',
-      nama_latin: 'Epinephelus sp.',
-      deskripsi: 'Ikan laut ekonomis tinggi, cocok untuk keramba jaring apung di perairan pesisir.',
-      gambar: '🐟',
-      parameter: {
-        ph: { min: 7.5, max: 8.5, bobot: 0.30 },
-        suhu: { min: 24.0, max: 30.0, bobot: 0.30 },
-        do: { min: 5.0, max: 8.0, bobot: 0.25 },
-        tds: { min: 100.0, max: 400.0, bobot: 0.15 },
-      },
-    },
-    {
-      nama: 'Kakap Putih',
-      nama_latin: 'Lates calcarifer',
-      deskripsi: 'Ikan yang adaptif terhadap berbagai salinitas, ideal untuk tambak dan keramba pesisir.',
-      gambar: '🐠',
-      parameter: {
-        ph: { min: 7.5, max: 8.5, bobot: 0.30 },
-        suhu: { min: 25.0, max: 32.0, bobot: 0.30 },
-        do: { min: 5.0, max: 9.0, bobot: 0.25 },
-        tds: { min: 100.0, max: 500.0, bobot: 0.15 },
-      },
-    },
-    {
-      nama: 'Bandeng',
-      nama_latin: 'Chanos chanos',
-      deskripsi: 'Ikan euryhaline yang tahan terhadap perubahan kondisi air, sangat cocok untuk tambak pesisir Jepara.',
-      gambar: '🐡',
-      parameter: {
-        ph: { min: 7.0, max: 8.5, bobot: 0.30 },
-        suhu: { min: 26.0, max: 32.0, bobot: 0.30 },
-        do: { min: 4.0, max: 8.0, bobot: 0.25 },
-        tds: { min: 100.0, max: 500.0, bobot: 0.15 },
-      },
-    },
-  ];
-
-  // Nilai sensor awal yang natural untuk perairan pesisir Jepara
-  const sensorRef = useRef({
-    ph: 7.8,
-    suhu: 28.0,
-    do: 6.5,
-    tds: 250.0,
-  });
-
-  const hitungSkor = (value, min, max, bobot) => {
-    let skor;
-    if (value >= min && value <= max) {
-      const mid = (min + max) / 2;
-      const range = (max - min) / 2;
-      skor = 100 - (Math.abs(value - mid) / range) * 20;
-    } else {
-      const deviasi = value < min ? min - value : value - max;
-      const range = max - min;
-      skor = Math.max(0, 100 - (deviasi / range) * 100);
+  const fetchRekomendasi = useCallback(async () => {
+    try {
+      const res = await api.get('/rekomendasi-ikan');
+      setData(res.data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
-    return skor * bobot;
-  };
-
-  const hitungRekomendasi = (sensorValues) => {
-    const hasil = ikanParams.map((ikan) => {
-      let totalSkor = 0;
-      const detail = {};
-
-      Object.entries(ikan.parameter).forEach(([param, config]) => {
-        const value = sensorValues[param];
-        if (value === undefined) return;
-        const skor = hitungSkor(value, config.min, config.max, config.bobot);
-        totalSkor += skor;
-        detail[param] = {
-          value,
-          min: config.min,
-          max: config.max,
-          skor: Math.round((skor / config.bobot) * 10) / 10,
-          dalam_range: value >= config.min && value <= config.max,
-        };
-      });
-
-      const persentase = Math.round(totalSkor * 10) / 10;
-      let status, color;
-      if (persentase >= 80) { status = 'Sangat Direkomendasikan'; color = 'emerald'; }
-      else if (persentase >= 60) { status = 'Direkomendasikan'; color = 'blue'; }
-      else { status = 'Kurang Cocok'; color = 'red'; }
-
-      return { ...ikan, persentase, status, color, detail };
-    });
-
-    hasil.sort((a, b) => b.persentase - a.persentase);
-    return hasil;
-  };
-
-  // Update nilai sensor secara natural setiap 1 detik
-  const updateSensor = () => {
-    const deltas = {
-      ph: 0.03,
-      suhu: 0.15,
-      do: 0.1,
-      tds: 3.0,
-    };
-    const ranges = {
-      ph: { min: 7.0, max: 8.5 },
-      suhu: { min: 26.0, max: 32.0 },
-      do: { min: 4.0, max: 9.0 },
-      tds: { min: 100.0, max: 500.0 },
-    };
-
-    const current = sensorRef.current;
-    const newValues = {};
-
-    Object.keys(current).forEach((key) => {
-      const change = (Math.random() > 0.5 ? 1 : -1) * Math.random() * deltas[key];
-      let newVal = Math.round((current[key] + change) * 100) / 100;
-      newVal = Math.max(ranges[key].min, Math.min(ranges[key].max, newVal));
-      newValues[key] = newVal;
-    });
-
-    sensorRef.current = newValues;
-
-    const rekomendasi = hitungRekomendasi(newValues);
-    setData({ sensor_values: newValues, rekomendasi });
-    setLoading(false);
-  };
+  }, []);
 
   useEffect(() => {
-    updateSensor();
-    simRef.current = setInterval(updateSensor, 1000);
-    return () => { if (simRef.current) clearInterval(simRef.current); };
-  }, []);
+    fetchRekomendasi();
+    const interval = setInterval(fetchRekomendasi, 3000);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') fetchRekomendasi();
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [fetchRekomendasi]);
 
   const colorMap = {
     emerald: {
@@ -172,9 +62,7 @@ export default function RekomendasiIkanPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-bold">Rekomendasi Ikan</h2>
-          <p className="text-sm text-slate-400">
-            Berdasarkan kondisi air 
-          </p>
+          <p className="text-sm text-slate-400">Berdasarkan kondisi air terkini</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="relative flex h-2.5 w-2.5">
@@ -269,7 +157,7 @@ export default function RekomendasiIkanPage() {
       </div>
 
       <p className="text-xs text-slate-400 text-center">
-        * Rekomendasi berdasarkan parameter kualitas air menggunakan metode Decision support system (DSS)
+        * Rekomendasi berdasarkan parameter kualitas air menggunakan metode Decision Support System (DSS)
       </p>
     </div>
   );

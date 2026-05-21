@@ -16,6 +16,8 @@ export default function TimeSeriesChart({ series, title, unit, thresholdMin, thr
         easing: 'easeinout',
         speed: 600,
       },
+      locales: [{ name: 'id' }], 
+      defaultLocale: 'id', 
     },
     dataLabels: { enabled: false },
     stroke: { curve: 'smooth', width: 2.5 },
@@ -33,6 +35,7 @@ export default function TimeSeriesChart({ series, title, unit, thresholdMin, thr
       labels: {
         style: { colors: dark ? '#64748b' : '#94a3b8', fontSize: '11px' },
         datetimeFormatter: { hour: 'HH:mm', day: 'dd MMM' },
+        datetimeUTC: false, // 
       },
       axisBorder: { show: false },
       axisTicks: { show: false },
